@@ -87,7 +87,7 @@ The notebook expects yield data across the following maturities:
 | `ZC2000YR` | 20Y |
 | `ZC3000YR` | 30Y |
 
-prediction rule: during testing, the model is allowed to use only the **3M yield** for that day. All other maturities must be reconstructed from the calibrated model or its approved extensions.
+Prediction Rule: during testing, the model is allowed to use only the **3M yield** for that day. All other maturities must be reconstructed from the calibrated model or its approved extensions.
 
 ---
 
