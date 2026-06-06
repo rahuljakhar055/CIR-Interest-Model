@@ -1,0 +1,37 @@
+## Required Project Questions: Answers
+
+How sensitive is the calibrated yield curve to the choice of calibration methodology?
+
+It is highly sensitive. Short-rate MLE focuses only on the dynamics of the 3M rate, while curve calibration penalizes errors across all maturities. Therefore, the two methods can produce different kappa, theta, and sigma, especially when the observed yield curve contains slope and curvature effects that a one-factor CIR process cannot represent exactly.
+
+Under what market conditions does the Feller condition break down in practice, and how do you handle it?
+
+The Feller condition can fail when volatility is high relative to the mean-reversion speed and long-run mean. This often appears during stressed, low-rate, or regime-changing periods. This notebook checks the condition and adds a penalty during curve calibration when 2*kappa*theta < sigma^2.
+
+What does the mean-reversion speed kappa imply about persistence of shocks?
+
+A high kappa means shocks decay quickly and rates return rapidly toward theta. A low kappa means shocks are persistent. In market data, very low estimated kappa suggests that policy regimes or macro conditions are slow-moving.
+
+How accurately can the 3M rate alone reconstruct the full yield curve?
+
+The final answer is measured by the out-of-sample R2 table above. Short maturities are usually easier because they are closely linked to the 3M rate. Longer maturities are harder because they depend on expectations, term premia, inflation risk, and curve slope/curvature.
+
+Where does base CIR systematically over- or underestimate yields, and why?
+
+The maturity-level error table shows where this happens. Systematic errors occur because a one-factor CIR model forces the whole curve to move with one state variable. It cannot independently model level, slope, and curvature.
+
+Does the extension meaningfully improve out-of-sample performance, or does it overfit?
+
+Compare Base_R2 and CIRpp_R2. If CIR++ improves test R2 and reduces RMSE across several maturities, it is useful. If it improves training fit but weakens test metrics, it is overfitting. Ridge regularization is used to reduce this risk.
+
+What mathematical structure justifies the chosen extension?
+
+CIR++ keeps the stochastic CIR short-rate core but adds a deterministic correction to fit term-structure residuals. This directly addresses the fact that base CIR cannot fit arbitrary yield curve shapes.
+
+How do jump processes change yield curves during stress periods?
+
+Jump processes allow discontinuous short-rate moves, so predicted curves can shift sharply during stress or policy-shock periods. This is more realistic than pure diffusion but harder to estimate.
+
+What additional estimation challenges do two-factor or time-dependent models introduce?
+
+Two-factor models require estimating latent factors and more parameters. Time-dependent models require stable functions of time or maturity. Both increase flexibility but also increase overfitting and numerical instability risk.
