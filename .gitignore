@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Raw data
+data/raw/
+*.csv
+
+# Local/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Prior generated scratch artifacts
+CIR_complete_project.ipynb
+CIR_complete_project_colab.py
