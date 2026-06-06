@@ -1,37 +1,211 @@
-## Required Project Questions: Answers
+ANSWERS TO THE REQUIRED PROJECT QUESTIONS
+Project: Stochastic Interest Rate Modelling and Prediction using the CIR Model
 
-How sensitive is the calibrated yield curve to the choice of calibration methodology?
+This file answers the key analytical questions from the project statement using the results and modelling choices from the notebook.
 
-It is highly sensitive. Short-rate MLE focuses only on the dynamics of the 3M rate, while curve calibration penalizes errors across all maturities. Therefore, the two methods can produce different kappa, theta, and sigma, especially when the observed yield curve contains slope and curvature effects that a one-factor CIR process cannot represent exactly.
+------------------------------------------------------------
+1. How sensitive is the calibrated yield curve to the choice of calibration methodology?
+------------------------------------------------------------
 
-Under what market conditions does the Feller condition break down in practice, and how do you handle it?
+The calibrated yield curve is quite sensitive to the calibration method because different methods optimize different objectives.
 
-The Feller condition can fail when volatility is high relative to the mean-reversion speed and long-run mean. This often appears during stressed, low-rate, or regime-changing periods. This notebook checks the condition and adds a penalty during curve calibration when 2*kappa*theta < sigma^2.
+In this project, two main CIR calibrations were tested:
 
-What does the mean-reversion speed kappa imply about persistence of shocks?
+- Short-rate MLE calibration:
+  kappa  = 1.418767e-09
+  theta  = 0.001047
+  sigma  = 0.041424
 
-A high kappa means shocks decay quickly and rates return rapidly toward theta. A low kappa means shocks are persistent. In market data, very low estimated kappa suggests that policy regimes or macro conditions are slow-moving.
+- Curve-calibrated CIR:
+  kappa  = 0.165893
+  theta  = 0.024399
+  sigma  = 0.000921
 
-How accurately can the 3M rate alone reconstruct the full yield curve?
+The MLE method focuses only on the time-series behaviour of the 3M rate. Because of that, it mainly tries to explain how the short rate evolves from one day to the next. On the other hand, the curve-calibrated CIR method directly minimizes yield-curve reconstruction error across the training maturities.
 
-The final answer is measured by the out-of-sample R2 table above. Short maturities are usually easier because they are closely linked to the 3M rate. Longer maturities are harder because they depend on expectations, term premia, inflation risk, and curve slope/curvature.
+This difference is important. The same 3M short-rate data can produce very different parameter values depending on whether the goal is to explain short-rate dynamics or to reconstruct the full yield curve. In this notebook, the curve-calibrated CIR model gave the best overall out-of-sample performance, with an overall R2 of about 0.893 on the available test maturities. This shows that calibration should be chosen according to the final prediction task, not only according to theoretical neatness.
 
-Where does base CIR systematically over- or underestimate yields, and why?
+------------------------------------------------------------
+2. Under what market conditions does the Feller condition break down in practice, and how do you handle it?
+------------------------------------------------------------
 
-The maturity-level error table shows where this happens. Systematic errors occur because a one-factor CIR model forces the whole curve to move with one state variable. It cannot independently model level, slope, and curvature.
+The Feller condition for the CIR model is:
 
-Does the extension meaningfully improve out-of-sample performance, or does it overfit?
+2 * kappa * theta >= sigma^2
 
-Compare Base_R2 and CIRpp_R2. If CIR++ improves test R2 and reduces RMSE across several maturities, it is useful. If it improves training fit but weakens test metrics, it is overfitting. Ridge regularization is used to reduce this risk.
+It is important because it helps keep the short rate strictly positive in the CIR process.
 
-What mathematical structure justifies the chosen extension?
+In practice, the Feller condition often breaks down when:
 
-CIR++ keeps the stochastic CIR short-rate core but adds a deterministic correction to fit term-structure residuals. This directly addresses the fact that base CIR cannot fit arbitrary yield curve shapes.
+- volatility is high,
+- mean reversion is weak,
+- the long-run mean rate is very low,
+- the market is passing through a stress period or regime shift,
+- interest rates are close to zero and small shocks become large relative to the level of rates.
 
-How do jump processes change yield curves during stress periods?
+In this project, the short-rate MLE calibration failed the Feller condition:
 
-Jump processes allow discontinuous short-rate moves, so predicted curves can shift sharply during stress or policy-shock periods. This is more realistic than pure diffusion but harder to estimate.
+2 * kappa * theta ≈ 0.00000000
+sigma^2           ≈ 0.00171597
+Feller condition satisfied: No
 
-What additional estimation challenges do two-factor or time-dependent models introduce?
+This happened because the estimated kappa was almost zero while sigma was relatively high. That means the model saw the short rate as highly persistent and volatile, which makes the positivity condition hard to satisfy.
 
-Two-factor models require estimating latent factors and more parameters. Time-dependent models require stable functions of time or maturity. Both increase flexibility but also increase overfitting and numerical instability risk.
+The curve-calibrated CIR model satisfied the condition:
+
+2 * kappa * theta ≈ 0.00809527
+sigma^2           ≈ 0.00000085
+Feller condition satisfied: Yes
+
+To handle this issue, the notebook checks the Feller condition explicitly and uses a penalty during curve calibration whenever 2 * kappa * theta < sigma^2. This does not magically remove all model risk, but it keeps the fitted parameters more consistent with the mathematical assumptions of the CIR model.
+
+------------------------------------------------------------
+3. What does the mean-reversion speed kappa imply about the persistence of interest-rate shocks in the data?
+------------------------------------------------------------
+
+The parameter kappa controls how quickly the short rate returns toward its long-run mean theta after a shock.
+
+- A high kappa means shocks fade quickly.
+- A low kappa means shocks are persistent.
+- A kappa close to zero means the short rate behaves almost like a very slow-moving process, so shocks can remain for a long time.
+
+In the short-rate MLE calibration, kappa was approximately 1.42e-09, which is almost zero. This suggests that, from the daily 3M time series alone, shocks looked extremely persistent.
+
+In the curve-calibrated CIR model, kappa was about 0.1659. Interpreted annually, this corresponds to a rough shock half-life of:
+
+ln(2) / 0.1659 ≈ 4.18 years
+
+That is still slow mean reversion. It suggests that interest-rate changes in the data are not quickly reversed. This makes sense for yield data because interest rates are often driven by policy regimes, inflation expectations, and macroeconomic conditions, which usually change gradually rather than disappearing overnight.
+
+------------------------------------------------------------
+4. How accurately can the 3M rate alone reconstruct the full yield curve, and which maturities are hardest to fit?
+------------------------------------------------------------
+
+The 3M rate alone reconstructed the short end of the yield curve quite well, but performance weakened as maturity increased.
+
+For the base curve-calibrated CIR model, the test results were:
+
+Tenor      R2        RMSE       MAE
+6M       0.9944    0.000588   0.000431
+9M       0.9675    0.001301   0.000968
+1Y       0.9101    0.001973   0.001472
+2Y       0.3895    0.003655   0.002807
+Overall  0.8930    0.002196   0.001420
+
+The 6M, 9M, and 1Y maturities were fitted very well because they are close to the 3M input and are strongly linked to short-rate movements.
+
+The hardest evaluated maturity was 2Y. Its R2 was much lower than the shorter maturities. This happens because the 2Y yield already reflects more than the current short rate. It includes expectations about future rates, policy direction, inflation expectations, liquidity effects, and term premium. A single 3M input cannot fully describe all of those effects.
+
+The notebook also predicts 5Y, 10Y, 20Y, and 30Y, but the uploaded test actual file did not contain those maturities, so out-of-sample metrics could only be calculated for 6M, 9M, 1Y, and 2Y.
+
+------------------------------------------------------------
+5. Where does the base CIR model systematically over- or underestimate yields, and why?
+------------------------------------------------------------
+
+The base CIR model performs best at short maturities and becomes weaker as the maturity increases. The error pattern shows that the model struggles most around the 2Y maturity in the available test set.
+
+The main reason is structural. The base CIR model is a one-factor short-rate model. It assumes that the entire yield curve is driven by one state variable: the short rate. This is a strong restriction.
+
+Real yield curves move through several types of changes:
+
+- level shifts, where the whole curve moves up or down,
+- slope changes, where short and long rates move differently,
+- curvature changes, where the middle of the curve moves differently from both ends.
+
+A one-factor CIR model cannot independently capture all three. Because of this, it can systematically overestimate or underestimate maturities whose movement is driven by slope or curvature rather than only by the current short rate.
+
+In this project, the 2Y tenor had the weakest base-model R2. That suggests the base CIR curve shape was not flexible enough to match the transition from the very short end to the medium section of the curve.
+
+------------------------------------------------------------
+6. Does the extension meaningfully improve out-of-sample performance, or does it overfit the training period?
+------------------------------------------------------------
+
+The extension analysis gives a mixed answer.
+
+The notebook tested multiple extensions:
+
+Model                         Overall R2    Overall RMSE    Overall MAE
+Base / Curve-Calibrated CIR     0.8930        0.002196       0.001420
+CIR++ Residual Extension        0.7254        0.003519       0.003143
+Validation-Selected Hybrid      0.7628        0.003270       0.002707
+Targeted CIR Extension          0.8546        0.002560       0.001941
+
+The CIR++ residual extension and validation-selected hybrid did not improve the overall test performance compared with the base curve-calibrated CIR model. This suggests that the added flexibility may have fitted training-period residual patterns that did not generalize well to the test period.
+
+The targeted extension crossed the required R2 threshold of 0.85, but it still did not beat the base curve-calibrated CIR model overall.
+
+Therefore, in this notebook, the extension does not meaningfully improve overall out-of-sample performance. It is useful for analysis because it shows where extra flexibility can help, but the best-performing and most reliable model remains the curve-calibrated CIR model. This is a good example of why a more complicated model is not always a better model.
+
+------------------------------------------------------------
+7. What mathematical structure justifies the chosen extension over the alternatives?
+------------------------------------------------------------
+
+The chosen extension is a CIR++-style residual correction and targeted maturity-wise correction.
+
+The mathematical idea is:
+
+actual_yield(tau) = CIR_yield(tau, r_3M) + correction(r_3M, tau)
+
+This keeps the CIR model as the stochastic short-rate core, while adding a deterministic correction surface to handle curve-shape errors.
+
+This structure is justified because the base CIR model has a known limitation: it cannot fit every possible initial yield curve or arbitrary slope and curvature pattern. A deterministic residual correction directly targets this weakness without breaking the project rule that only the 3M yield can be used during prediction.
+
+Compared with a two-factor CIR model, this approach is easier to estimate because it does not require hidden latent factors. Compared with a jump-diffusion model, it is more directly useful for yield-curve reconstruction because the main problem here is not only sudden jumps, but also the limited shape flexibility of the base one-factor model.
+
+So the extension was chosen because it is practical, interpretable, and directly connected to the observed weakness of the base CIR model.
+
+------------------------------------------------------------
+8. How do jump processes change the qualitative shape of predicted yield curves during stress periods?
+------------------------------------------------------------
+
+Jump processes add sudden discontinuous movements to the short-rate process. A jump-diffusion short-rate model can be written conceptually as:
+
+dr_t = kappa(theta - r_t)dt + sigma sqrt(r_t)dW_t + jump term
+
+The jump term allows the rate to move sharply in response to stress events, policy announcements, liquidity shocks, or other sudden market news.
+
+Qualitatively, jumps can change predicted yield curves in the following ways:
+
+- They can create sudden upward or downward shifts in the short end of the curve.
+- They can make the curve react faster during stress periods than a pure diffusion model.
+- They can produce sharper changes in slope if short maturities react more strongly than long maturities.
+- They can improve realism during market shocks, where interest rates do not move smoothly.
+
+However, jump models are harder to estimate. The model must estimate jump frequency, jump size distribution, diffusion volatility, and mean reversion at the same time. With limited data, it can be difficult to separate a genuine jump from an unusually large normal daily movement.
+
+In this project, the implemented extension focused more on residual curve-shape correction than jump modelling because the main task was reconstructing the yield curve from 3M, not modelling rare stress events separately.
+
+------------------------------------------------------------
+9. What are the additional estimation challenges introduced by a two-factor or time-dependent model?
+------------------------------------------------------------
+
+Two-factor and time-dependent models are more flexible, but they introduce several estimation challenges.
+
+For a two-factor CIR model:
+
+- There are more parameters to estimate.
+- One or both factors may be latent and not directly observable.
+- The model must decide how the two factors affect different maturities.
+- Calibration can become numerically unstable.
+- The factors may be difficult to interpret clearly.
+- Overfitting risk increases because the model has more freedom.
+
+The advantage is that two factors can represent different sources of yield-curve movement, such as level and slope. This can improve realism, especially for longer maturities.
+
+For a time-dependent CIR or CIR++ model:
+
+- Parameters or correction functions must vary with time or maturity.
+- The model can fit the initial yield curve more accurately, but may generalize poorly.
+- Smoothness and regularization become important.
+- Calibration becomes more sensitive to noise and outliers.
+- It becomes harder to separate true market structure from fitted correction terms.
+
+Overall, these extensions improve flexibility but reduce simplicity. The main modelling trade-off is between accuracy and robustness. In this project, the base curve-calibrated CIR model gave the strongest out-of-sample result, so it remained the most suitable final model despite the availability of more complex extensions.
+
+------------------------------------------------------------
+Final Summary
+------------------------------------------------------------
+
+The project shows that the 3M yield is powerful for reconstructing nearby maturities, especially 6M, 9M, and 1Y. The base curve-calibrated CIR model achieved an overall out-of-sample R2 of about 0.893, which clears the required benchmark of 0.85.
+
+The main weakness appears at longer or medium maturities, especially 2Y in the available test set, because a one-factor short-rate model cannot fully capture yield-curve slope and curvature. Extensions can add flexibility, but in this notebook they did not beat the base curve-calibrated CIR model overall, which suggests that the simplest well-calibrated model was also the most reliable one for this dataset.
