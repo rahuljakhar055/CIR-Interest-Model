@@ -91,7 +91,7 @@ Prediction Rule: during testing, the model is allowed to use only the **3M yield
 
 ---
 
-The notebook is designed to be run in Google Colab because it uses `google.colab.files.upload()` for data upload.
+The Project contains notebook file to run in Google Colab as it uses `google.colab.files.upload()` for data upload.
 
 ---
 
